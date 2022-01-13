@@ -1,0 +1,23 @@
+#!/bin/bash
+
+python_name=`echo $1 | awk -F"/" '{print $NF}'`
+docker_name=`echo ${python_name} | awk -F"." '{print $1}'`
+cmd=`echo $* | awk -F"${python_name}" '{print $NF}'`
+last_pos=`echo $1 | awk -F"/" '{printf "%d", length($0)-length($NF)}'`
+volume_dir=${1:0:${last_pos}}
+if [[ "${1:0:1}" != "/" ]]; then
+    volume_dir=${PWD}/${volume_dir}
+fi
+docker_name="pyenv3_${docker_name}"
+if [[ `sudo docker ps | grep ${docker_name} | wc -l` == "0" ]]; then
+    if [[ `sudo docker ps -a | grep ${docker_name} | wc -l` != "0" ]]; then
+        sudo docker rm -f ${docker_name} >/dev/null
+    fi
+    # 后台启动容器
+    sudo docker run -d --name ${docker_name} -v ${volume_dir}:/data/job -v ${PWD}/env:/data/env wangjunkangha/pyenv3 >/dev/null 2>&1
+    # 安装依赖
+    if [[ -f "${PWD}/env/requirements.txt" ]]; then
+        sudo docker exec ${docker_name} pip install -r /data/env/requirements.txt >/dev/null 2>&1
+    fi
+fi
+sudo docker exec ${docker_name} python /data/job/${python_name} ${cmd}
